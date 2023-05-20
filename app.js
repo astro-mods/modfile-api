@@ -1,8 +1,14 @@
 const express = require('express');
+const cors = require('cors');
 const uploadRouter = require('./upload');
 const contentRouter = require('./content');
 
+
+
 const app = express();
+
+// Enable CORS
+app.use(cors());
 
 // Mount the file upload router
 app.use('/upload', uploadRouter);
