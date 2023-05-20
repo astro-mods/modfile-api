@@ -8,6 +8,11 @@ const app = express();
 app.use('/upload', uploadRouter);
 app.use ('/content', contentRouter);
 
+app.get('/healthz', (req, res) => {
+  res.send('OK');
+});
+
+
 app.listen(3000, () => {
   console.log('Server is running on port 3000');
 });
