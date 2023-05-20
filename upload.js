@@ -2,21 +2,20 @@ const express = require('express');
 const multer = require('multer');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { v4: uuidv4 } = require('uuid');
-const fs = require('fs');
 require('dotenv').config();
 
 const s3Client = new S3Client({
-  region: 'us-east-1', // Replace with your AWS region
+  region: process.env.AWS_REGION,
   credentials: {
-    accessKeyId: process.env.ACCESS_KEY_ID, // Replace with your AWS access key ID
-    secretAccessKey: process.env.ACCESS_KEY_SECRET // Replace with your AWS secret access key
+    accessKeyId: process.env.ACCESS_KEY_ID,
+    secretAccessKey: process.env.ACCESS_KEY_SECRET
   }
 });
 
-const bucketName = 'modlist-data-bucket';
+const bucketName = process.env.BUCKET_NAME;
 
 const router = express.Router();
-const upload = multer({ dest: 'uploads/' });
+const upload = multer();
 
 router.post('/', upload.single('file'), async (req, res) => {
   if (!req.file) {
@@ -25,13 +24,12 @@ router.post('/', upload.single('file'), async (req, res) => {
 
   const file = req.file;
 
-  // Generate a unique ID for the file
+  if (file.size === 0) {
+    return res.status(400).json({ error: 'Empty file provided' });
+  }
+
   const uniqueId = uuidv4();
-
-  // Secure the filename
   const filename = file.originalname.replace(/[^a-zA-Z0-9.]/g, '-');
-
-  // Construct the S3 object key using the generated ID and filename
   const s3Key = `${uniqueId}/${filename}`;
 
   const uploadParams = {
@@ -41,16 +39,8 @@ router.post('/', upload.single('file'), async (req, res) => {
   };
 
   try {
-    await s3Client.send(new PutObjectCommand(uploadParams));
-    console.log('File uploaded successfully!');
-
-    // Delete the temporary file after upload
-    fs.unlink(file.path, (error) => {
-      if (error) {
-        console.error('Error deleting temporary file:', error);
-      }
-    });
-
+    const response = await s3Client.send(new PutObjectCommand(uploadParams));
+    console.log('File uploaded successfully:', response);
     return res.status(200).json({ uniqueId, filename });
   } catch (err) {
     console.error('Error uploading file:', err);

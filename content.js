@@ -4,8 +4,10 @@ require('dotenv').config();
 
 const s3 = new AWS.S3({
   region: process.env.AWS_REGION, // Replace with your AWS region
-  accessKeyId: process.env.ACCESS_KEY_ID, // Replace with your AWS access key ID
-  secretAccessKey: process.env.ACCESS_KEY_SECRET // Replace with your AWS secret access key
+  credentials: {
+    accessKeyId: process.env.ACCESS_KEY_ID, // Replace with your AWS access key ID
+    secretAccessKey: process.env.ACCESS_KEY_SECRET // Replace with your AWS secret access key
+  }
 });
 
 const bucketName = process.env.BUCKET_NAME;
