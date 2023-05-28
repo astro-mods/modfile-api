@@ -33,12 +33,12 @@ router.get('/:uniqueId/:filename', (req, res) => {
     }
 
     console.log('File downloaded successfully!');
-    res.setHeader('Content-Type', data.ContentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('content-Type', data.ContentType);
+    res.setHeader('content-Disposition', `attachment; filename="${filename}"`);
 
     // Calculate the MD5 hash of the file
     const md5Hash = crypto.createHash('md5').update(data.Body).digest('base64');
-    res.setHeader('Content-MD5', md5Hash);
+    res.setHeader('content-MD5', md5Hash);
 
     // Send the file data in the response
     return res.send(data.Body);
