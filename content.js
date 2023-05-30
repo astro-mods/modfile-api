@@ -38,12 +38,16 @@ router.get('/:uniqueId/:filename', (req, res) => {
     }
 
     console.log('File downloaded successfully!');
-    res.setHeader('content-Type', data.ContentType);
-    res.setHeader('content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', data.ContentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
     // Calculate the MD5 hash of the file
     const md5Hash = crypto.createHash('md5').update(data.Body).digest('base64');
-    res.setHeader('content-MD5', md5Hash);
+    res.setHeader('Content-MD5', md5Hash);
+
+    // Set caching headers
+    res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache the file for 1 hour (adjust the value as needed)
+    res.setHeader('Expires', new Date(Date.now() + 31536000000).toUTCString()); // Expires header for 1 hour in the future
 
     // Send the file data in the response
     return res.send(data.Body);
