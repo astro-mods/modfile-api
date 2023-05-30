@@ -29,7 +29,12 @@ router.get('/:uniqueId/:filename', (req, res) => {
   s3.getObject(downloadParams, (err, data) => {
     if (err) {
       console.error('Error downloading file:', err);
-      return res.status(500).json({ error: 'Failed to download file' });
+
+      if (err.code === 'NoSuchKey') {
+        return res.status(404).json({ error: 'File not found' });
+      }
+
+      return res.status(500).json({ error: 'Failed to download file', details: err.message });
     }
 
     console.log('File downloaded successfully!');
