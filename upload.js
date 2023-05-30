@@ -15,7 +15,12 @@ const s3Client = new S3Client({
 const bucketName = process.env.BUCKET_NAME;
 
 const router = express.Router();
-const upload = multer();
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 100 * 1024 * 1024 // 100MB size limit
+  }
+});
 
 router.post('/', upload.single('file'), async (req, res) => {
   if (!req.file) {
@@ -26,6 +31,23 @@ router.post('/', upload.single('file'), async (req, res) => {
 
   if (file.size === 0) {
     return res.status(400).json({ error: 'Empty file provided' });
+  }
+
+  // Perform additional file validation checks here
+  // For example, check file type, size limits, or perform custom validations
+
+// Example: File type validation (allow mod files only)
+const allowedFileExtensions = ['.zip', '.pack', '.dll'];
+const fileExtension = file.originalname.substring(file.originalname.lastIndexOf('.')).toLowerCase();
+if (!allowedFileExtensions.includes(fileExtension)) {
+  return res.status(400).json({ error: 'Invalid file type. Only .zip, .pack, and .dll files are allowed' });
+}
+
+
+  // Example: File size validation (limit to 10MB)
+  const maxSizeBytes = 10 * 1024 * 1024;
+  if (file.size > maxSizeBytes) {
+    return res.status(400).json({ error: 'File size exceeds the maximum limit of 10MB' });
   }
 
   const uniqueId = uuidv4();
