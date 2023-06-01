@@ -15,6 +15,7 @@ const bucketName = process.env.BUCKET_NAME;
 
 const router = express.Router();
 
+// GET route for downloading the file
 router.get('/:uniqueId/:filename', (req, res) => {
   const { uniqueId, filename } = req.params;
 
@@ -51,6 +52,38 @@ router.get('/:uniqueId/:filename', (req, res) => {
 
     // Send the file data in the response
     return res.send(data.Body);
+  });
+});
+
+// HEAD route for retrieving file headers and metadata
+router.head('/:uniqueId/:filename', (req, res) => {
+  const { uniqueId, filename } = req.params;
+
+  // Construct the S3 object key using the unique ID and filename
+  const s3Key = `${uniqueId}/${filename}`;
+
+  const headParams = {
+    Bucket: bucketName,
+    Key: s3Key
+  };
+
+  s3.headObject(headParams, (err, data) => {
+    if (err) {
+      console.error('Error retrieving headers:', err);
+
+      if (err.code === 'NoSuchKey') {
+        return res.status(404).json({ error: 'File not found' });
+      }
+
+      return res.status(500).json({ error: 'Failed to retrieve headers', details: err.message });
+    }
+
+    console.log('Headers retrieved successfully!');
+    res.setHeader('Content-Type', data.ContentType);
+    res.setHeader('Content-Length', data.ContentLength);
+
+    // Send the headers in the response
+    return res.end();
   });
 });
 
