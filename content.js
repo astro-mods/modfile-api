@@ -1,6 +1,7 @@
 const express = require('express');
 const AWS = require('aws-sdk');
 const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const s3 = new AWS.S3({
@@ -15,8 +16,52 @@ const bucketName = process.env.BUCKET_NAME;
 
 const router = express.Router();
 
+// Rate limiting configuration
+const headLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 100, // Limit each IP to 100 HEAD requests per minute
+});
+
+const downloadLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 10, // Limit each IP to 10 GET requests per minute
+});
+
+// HEAD route for retrieving file headers and metadata
+router.head('/:uniqueId/:filename', headLimiter, (req, res) => {
+  const { uniqueId, filename } = req.params;
+
+  // Construct the S3 object key using the unique ID and filename
+  const s3Key = `${uniqueId}/${filename}`;
+
+  const headParams = {
+    Bucket: bucketName,
+    Key: s3Key  
+  };
+
+  s3.headObject(headParams, (err, data) => {
+    if (err) {
+      console.error('Error retrieving headers:', err);
+
+      if (err.code === 'NoSuchKey') {
+        return res.status(404).json({ error: 'File not found' });
+      }
+
+      return res.status(500).json({ error: 'Failed to retrieve headers', details: err.message });
+    }
+
+    console.log('Headers retrieved successfully!');
+    res.setHeader('Content-Type', data.ContentType);
+    res.setHeader('Content-Length', data.ContentLength);
+
+    // Send the headers in the response
+    return res.end();
+  });
+});
+
+
 // GET route for downloading the file
-router.get('/:uniqueId/:filename', (req, res) => {
+router.get('/:uniqueId/:filename', downloadLimiter, (req, res) => {
   const { uniqueId, filename } = req.params;
 
   // Construct the S3 object key using the unique ID and filename
@@ -55,36 +100,5 @@ router.get('/:uniqueId/:filename', (req, res) => {
   });
 });
 
-// HEAD route for retrieving file headers and metadata
-router.head('/:uniqueId/:filename', (req, res) => {
-  const { uniqueId, filename } = req.params;
-
-  // Construct the S3 object key using the unique ID and filename
-  const s3Key = `${uniqueId}/${filename}`;
-
-  const headParams = {
-    Bucket: bucketName,
-    Key: s3Key
-  };
-
-  s3.headObject(headParams, (err, data) => {
-    if (err) {
-      console.error('Error retrieving headers:', err);
-
-      if (err.code === 'NoSuchKey') {
-        return res.status(404).json({ error: 'File not found' });
-      }
-
-      return res.status(500).json({ error: 'Failed to retrieve headers', details: err.message });
-    }
-
-    console.log('Headers retrieved successfully!');
-    res.setHeader('Content-Type', data.ContentType);
-    res.setHeader('Content-Length', data.ContentLength);
-
-    // Send the headers in the response
-    return res.end();
-  });
-});
 
 module.exports = router;

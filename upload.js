@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { v4: uuidv4 } = require('uuid');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const s3Client = new S3Client({
@@ -21,7 +22,14 @@ const upload = multer({
   }
 });
 
-router.post('/', upload.single('file'), async (req, res) => {
+// Rate limiting configuration
+const uploadLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 10, // Limit each IP to 10 requests per minute for file uploads
+});
+
+
+router.post('/', uploadLimiter, upload.single('file'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file provided' });
   }
