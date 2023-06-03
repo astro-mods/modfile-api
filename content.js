@@ -2,6 +2,8 @@ const express = require('express');
 const AWS = require('aws-sdk');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 const s3 = new AWS.S3({
@@ -36,7 +38,7 @@ router.head('/:uniqueId/:filename', headLimiter, (req, res) => {
 
   const headParams = {
     Bucket: bucketName,
-    Key: s3Key  
+    Key: s3Key
   };
 
   s3.headObject(headParams, (err, data) => {
@@ -53,12 +55,54 @@ router.head('/:uniqueId/:filename', headLimiter, (req, res) => {
     console.log('Headers retrieved successfully!');
     res.setHeader('Content-Type', data.ContentType);
     res.setHeader('Content-Length', data.ContentLength);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
-    // Send the headers in the response
-    return res.end();
+    // Construct the key for the MD5 file
+    const md5Key = `${uniqueId}/${filename}.md5`;
+
+    // Check if MD5 file exists on S3
+    s3.headObject({ Bucket: bucketName, Key: md5Key }, (md5HeadErr) => {
+      if (!md5HeadErr) {
+        // MD5 file exists, retrieve the content and set it in the response headers
+        s3.getObject({ Bucket: bucketName, Key: md5Key }, (md5GetObjectErr, md5GetObjectData) => {
+          if (md5GetObjectErr) {
+            console.error('Error retrieving MD5 file:', md5GetObjectErr);
+            return res.status(500).json({ error: 'Failed to retrieve MD5 file', details: md5GetObjectErr.message });
+          }
+
+          const md5Hash = md5GetObjectData.Body.toString('utf8').trim();
+          res.setHeader('Content-MD5', md5Hash);
+
+          // Send the headers in the response
+          return res.end();
+        });
+      } else {
+        console.log('MD5 file does not exist, calculating MD5 hash...');
+        // MD5 file does not exist, calculate the MD5 hash and store it on S3
+        s3.getObject({ Bucket: bucketName, Key: s3Key }, (getObjectErr, getObjectData) => {
+          if (getObjectErr) {
+            console.error('Error retrieving file content:', getObjectErr);
+            return res.status(500).json({ error: 'Failed to retrieve file content', details: getObjectErr.message });
+          }
+
+          // Calculate the MD5 hash of the file content
+          const md5Hash = crypto.createHash('md5').update(getObjectData.Body).digest('base64');
+          res.setHeader('Content-MD5', md5Hash);
+
+          // Store the MD5 hash as a file on S3
+          s3.putObject({ Bucket: bucketName, Key: md5Key, Body: md5Hash }, (putObjectErr) => {
+            if (putObjectErr) {
+              console.error('Error storing MD5 file:', putObjectErr);
+            }
+          });
+
+          // Send the headers in the response
+          return res.end();
+        });
+      }
+    });
   });
 });
-
 
 // GET route for downloading the file
 router.get('/:uniqueId/:filename', downloadLimiter, (req, res) => {
